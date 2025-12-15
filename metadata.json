@@ -1,0 +1,5 @@
+{
+  "name": "OmniWorld Architect",
+  "description": "A comprehensive worldbuilding suite for RPGs and Game Devs. Features AI-powered lore generation, ruleset definition, scenario management, and export bridges for FoundryVTT and Unity.",
+  "requestFramePermissions": []
+}
