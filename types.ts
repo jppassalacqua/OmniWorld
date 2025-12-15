@@ -18,12 +18,20 @@ export enum AIProvider {
   OLLAMA = 'OLLAMA'
 }
 
+export interface SystemPrompts {
+  entityGen: string;
+  loreGen: string;
+  scenarioGen: string;
+  chatGen: string;
+}
+
 export interface AppSettings {
   aiProvider: AIProvider;
   geminiApiKey?: string;
   ollamaUrl: string; // e.g., "http://localhost:11434"
   ollamaModel: string; // e.g., "llama3"
   language: SupportedLanguage;
+  systemPrompts: SystemPrompts;
 }
 
 // --- Domain Models ---

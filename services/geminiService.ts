@@ -11,26 +11,33 @@ export const generateEntityDescription = async (
   type: EntityType,
   worldContext: string,
   system: GameSystem,
-  lang: SupportedLanguage
+  lang: SupportedLanguage,
+  promptTemplate?: string
 ): Promise<{ description: string; attributes: any }> => {
   if (!process.env.API_KEY) throw new Error("API Key missing");
 
   const model = "gemini-2.5-flash";
-  const prompt = `
+  const basePrompt = promptTemplate || `
     Context: You are a creative assistant for a Worldbuilder building a generic RPG world.
-    World Context: ${worldContext}
-    Game System: ${system.name} (Stats: ${system.stats.join(', ')})
-    Language: Generate content in ${lang === 'fr' ? 'FRENCH' : 'ENGLISH'}.
+    World Context: {{worldContext}}
+    Game System: {{systemName}} (Stats: {{systemStats}})
+    Language: Generate content in {{language}}.
     
-    Task: Generate a rich, immersive description and a set of game statistics for a ${type} named "${name}".
-    
-    Return JSON format only.
+    Task: Generate a rich, immersive description and a set of game statistics for a {{type}} named "{{name}}".
   `;
+
+  const finalPrompt = basePrompt
+    .replace('{{worldContext}}', worldContext)
+    .replace('{{systemName}}', system.name)
+    .replace('{{systemStats}}', system.stats.join(', '))
+    .replace('{{language}}', lang === 'fr' ? 'FRENCH' : 'ENGLISH')
+    .replace('{{type}}', type)
+    .replace('{{name}}', name) + "\n Return JSON format only.";
 
   try {
     const response = await ai.models.generateContent({
       model,
-      contents: prompt,
+      contents: finalPrompt,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -67,24 +74,32 @@ export const generateWorldLore = async (
   worldContext: string,
   genre: string,
   sections: string[],
-  lang: SupportedLanguage
+  lang: SupportedLanguage,
+  promptTemplate?: string
 ): Promise<{ sections: { title: string; content: string }[] }> => {
   if (!process.env.API_KEY) throw new Error("API Key missing");
 
   const model = "gemini-2.5-flash";
-  const prompt = `
-    Task: Create detailed lore for a new RPG world named "${worldName}".
-    World Context: ${worldContext}
-    Genre/Vibe: ${genre}.
-    Language: Generate content in ${lang === 'fr' ? 'FRENCH' : 'ENGLISH'}.
+  const basePrompt = promptTemplate || `
+    Task: Create detailed lore for a new RPG world named "{{worldName}}".
+    World Context: {{worldContext}}
+    Genre/Vibe: {{genre}}.
+    Language: Generate content in {{language}}.
     
-    Please generate content for the following sections: ${sections.join(', ')}.
+    Please generate content for the following sections: {{sections}}.
     Write in an evocative, encyclopedic tone.
   `;
 
+  const finalPrompt = basePrompt
+    .replace('{{worldName}}', worldName)
+    .replace('{{worldContext}}', worldContext)
+    .replace('{{genre}}', genre)
+    .replace('{{language}}', lang === 'fr' ? 'FRENCH' : 'ENGLISH')
+    .replace('{{sections}}', sections.join(', '));
+
   const response = await ai.models.generateContent({
     model,
-    contents: prompt,
+    contents: finalPrompt,
     config: {
       responseMimeType: "application/json",
       responseSchema: {
@@ -113,7 +128,8 @@ export const generateWorldLore = async (
 export const generateScenarioHook = async (
   worldContext: string,
   entities: string[],
-  lang: SupportedLanguage
+  lang: SupportedLanguage,
+  promptTemplate?: string
 ): Promise<{ 
   title: string; 
   synopsis: string; 
@@ -123,20 +139,23 @@ export const generateScenarioHook = async (
   if (!process.env.API_KEY) throw new Error("API Key missing");
 
   const model = "gemini-2.5-flash";
-  const prompt = `
-    Context: World: ${worldContext}.
-    Available Entities (Names): ${entities.join(', ')}.
-    Language: Generate content in ${lang === 'fr' ? 'FRENCH' : 'ENGLISH'}.
+  const basePrompt = promptTemplate || `
+    Context: World: {{worldContext}}.
+    Available Entities (Names): {{entities}}.
+    Language: Generate content in {{language}}.
     
     Task: Create a multi-scene scenario.
     IMPORTANT: If the scenario introduces KEY CHARACTERS, LOCATIONS, or ITEMS that do not exist in the Available Entities list, define them in the 'newEntities' array so I can create them in the database.
-    
-    Return JSON.
   `;
+
+  const finalPrompt = basePrompt
+    .replace('{{worldContext}}', worldContext)
+    .replace('{{entities}}', entities.join(', '))
+    .replace('{{language}}', lang === 'fr' ? 'FRENCH' : 'ENGLISH') + "\n Return JSON.";
 
   const response = await ai.models.generateContent({
     model,
-    contents: prompt,
+    contents: finalPrompt,
     config: {
       responseMimeType: "application/json",
       responseSchema: {
@@ -180,7 +199,8 @@ export const continueSessionChat = async (
   worldContext: string,
   scenarioContext: string,
   history: SessionMessage[],
-  lang: SupportedLanguage
+  lang: SupportedLanguage,
+  promptTemplate?: string
 ): Promise<{ response: string; newEntities: { name: string; type: EntityType; description: string }[] }> => {
   if (!process.env.API_KEY) throw new Error("API Key missing");
 
@@ -188,15 +208,15 @@ export const continueSessionChat = async (
   const recentHistory = history.slice(-10).map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n');
 
   const model = "gemini-2.5-flash";
-  const prompt = `
+  const basePrompt = promptTemplate || `
     You are an AI Game Master running a Tabletop RPG session.
-    Language: Respond in ${lang === 'fr' ? 'FRENCH' : 'ENGLISH'}.
+    Language: Respond in {{language}}.
     
-    World: ${worldContext}
-    Current Scenario: ${scenarioContext}
+    World: {{worldContext}}
+    Current Scenario: {{scenarioContext}}
     
     Chat History:
-    ${recentHistory}
+    {{history}}
     
     Task: Respond as the Game Master (SYSTEM). Describe the outcome of the user's action.
     If you invent a NEW significant NPC, Location, or Item that was not previously mentioned, please extract it into the 'newEntities' field.
@@ -204,9 +224,15 @@ export const continueSessionChat = async (
     Keep response under 150 words.
   `;
 
+  const finalPrompt = basePrompt
+    .replace('{{language}}', lang === 'fr' ? 'FRENCH' : 'ENGLISH')
+    .replace('{{worldContext}}', worldContext)
+    .replace('{{scenarioContext}}', scenarioContext)
+    .replace('{{history}}', recentHistory);
+
   const response = await ai.models.generateContent({
     model,
-    contents: prompt,
+    contents: finalPrompt,
     config: {
       responseMimeType: "application/json",
       responseSchema: {

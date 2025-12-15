@@ -37,15 +37,16 @@ export const generateEntityDescription = async (
   type: EntityType,
   worldContext: string,
   system: GameSystem,
-  lang: SupportedLanguage
+  lang: SupportedLanguage,
+  promptTemplate?: string
 ) => {
-  const prompt = `
+  const basePrompt = promptTemplate || `
     Context: RPG Worldbuilding.
-    World: ${worldContext}
-    System: ${system.name}.
-    Language: ${lang === 'fr' ? 'French' : 'English'}.
+    World: {{worldContext}}
+    System: {{systemName}}.
+    Language: {{language}}.
     
-    Task: Generate a description and attributes for a ${type} named "${name}".
+    Task: Generate a description and attributes for a {{type}} named "{{name}}".
     
     Format JSON:
     {
@@ -53,7 +54,14 @@ export const generateEntityDescription = async (
       "attributes": [{ "key": "string", "value": "string" }]
     }
   `;
-  const res = await fetchOllama(settings, prompt);
+  const finalPrompt = basePrompt
+    .replace('{{worldContext}}', worldContext)
+    .replace('{{systemName}}', system.name)
+    .replace('{{language}}', lang === 'fr' ? 'French' : 'English')
+    .replace('{{type}}', type)
+    .replace('{{name}}', name);
+
+  const res = await fetchOllama(settings, finalPrompt);
   return JSON.parse(res);
 };
 
@@ -63,20 +71,28 @@ export const generateWorldLore = async (
   worldContext: string,
   genre: string,
   sections: string[],
-  lang: SupportedLanguage
+  lang: SupportedLanguage,
+  promptTemplate?: string
 ) => {
-  const prompt = `
-    Task: Write lore for RPG world "${worldName}".
-    Context: ${worldContext}. Genre: ${genre}.
-    Sections to write: ${sections.join(', ')}.
-    Language: ${lang === 'fr' ? 'French' : 'English'}.
+  const basePrompt = promptTemplate || `
+    Task: Write lore for RPG world "{{worldName}}".
+    Context: {{worldContext}}. Genre: {{genre}}.
+    Sections to write: {{sections}}.
+    Language: {{language}}.
     
     Format JSON:
     {
       "sections": [{ "title": "string", "content": "string" }]
     }
   `;
-  const res = await fetchOllama(settings, prompt);
+  const finalPrompt = basePrompt
+    .replace('{{worldName}}', worldName)
+    .replace('{{worldContext}}', worldContext)
+    .replace('{{genre}}', genre)
+    .replace('{{language}}', lang === 'fr' ? 'French' : 'English')
+    .replace('{{sections}}', sections.join(', '));
+
+  const res = await fetchOllama(settings, finalPrompt);
   return JSON.parse(res);
 };
 
@@ -84,11 +100,12 @@ export const generateScenarioHook = async (
   settings: AppSettings,
   worldContext: string,
   entities: string[],
-  lang: SupportedLanguage
+  lang: SupportedLanguage,
+  promptTemplate?: string
 ) => {
-  const prompt = `
-    Context: World: ${worldContext}. Entities: ${entities.join(', ')}.
-    Language: ${lang === 'fr' ? 'French' : 'English'}.
+  const basePrompt = promptTemplate || `
+    Context: World: {{worldContext}}. Entities: {{entities}}.
+    Language: {{language}}.
     
     Task: Create a scenario hook.
     
@@ -100,7 +117,12 @@ export const generateScenarioHook = async (
       "newEntities": []
     }
   `;
-  const res = await fetchOllama(settings, prompt);
+  const finalPrompt = basePrompt
+    .replace('{{worldContext}}', worldContext)
+    .replace('{{entities}}', entities.join(', '))
+    .replace('{{language}}', lang === 'fr' ? 'French' : 'English');
+
+  const res = await fetchOllama(settings, finalPrompt);
   return JSON.parse(res);
 };
 
@@ -109,14 +131,15 @@ export const continueSessionChat = async (
   worldContext: string,
   scenarioContext: string,
   history: SessionMessage[],
-  lang: SupportedLanguage
+  lang: SupportedLanguage,
+  promptTemplate?: string
 ) => {
   const recent = history.slice(-5).map(m => `${m.role}: ${m.content}`).join('\n');
-  const prompt = `
+  const basePrompt = promptTemplate || `
     Role: RPG Game Master.
-    World: ${worldContext}. Scenario: ${scenarioContext}.
-    History: ${recent}.
-    Language: ${lang === 'fr' ? 'French' : 'English'}.
+    World: {{worldContext}}. Scenario: {{scenarioContext}}.
+    History: {{history}}.
+    Language: {{language}}.
     
     Response format JSON:
     {
@@ -124,7 +147,13 @@ export const continueSessionChat = async (
       "newEntities": []
     }
   `;
-  const res = await fetchOllama(settings, prompt);
+  const finalPrompt = basePrompt
+    .replace('{{worldContext}}', worldContext)
+    .replace('{{scenarioContext}}', scenarioContext)
+    .replace('{{history}}', recent)
+    .replace('{{language}}', lang === 'fr' ? 'French' : 'English');
+
+  const res = await fetchOllama(settings, finalPrompt);
   return JSON.parse(res);
 };
 

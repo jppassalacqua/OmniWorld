@@ -14,6 +14,7 @@ interface DashboardProps {
     handleCreate: (parentId?: string) => void;
     handleLoad: (id: string) => void;
     handleDelete: (id: string) => void;
+    onOpenSettings?: () => void;
     t: (key: string) => string;
 }
 
@@ -27,6 +28,7 @@ export const Dashboard = ({
     handleCreate,
     handleLoad,
     handleDelete,
+    onOpenSettings,
     t
 }: DashboardProps) => {
     

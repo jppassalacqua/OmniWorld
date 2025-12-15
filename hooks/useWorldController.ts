@@ -1,19 +1,52 @@
 
 import { useState, useEffect, useMemo } from 'react';
-import { WorldState, AppSettings, AIProvider, TreeNode } from '../types';
+import { WorldState, AppSettings, AIProvider, TreeNode, SystemPrompts } from '../types';
 import { dbService } from '../services/databaseService';
 import { AIServiceFactory } from '../services/aiService';
 import { getInitialWorldState } from '../utils/seedData';
 import { translations } from '../utils/translations';
 import { Globe2 } from 'lucide-react';
 
+const DEFAULT_PROMPTS: SystemPrompts = {
+    entityGen: `Context: RPG Worldbuilding.
+World Context: {{worldContext}}
+Game System: {{systemName}} (Stats: {{systemStats}})
+Language: Generate content in {{language}}.
+Task: Generate a rich, immersive description and a set of game statistics for a {{type}} named "{{name}}".`,
+    loreGen: `Task: Create detailed lore for a new RPG world named "{{worldName}}".
+World Context: {{worldContext}}
+Genre/Vibe: {{genre}}.
+Language: Generate content in {{language}}.
+Please generate content for the following sections: {{sections}}.
+Write in an evocative, encyclopedic tone.`,
+    scenarioGen: `Context: World: {{worldContext}}.
+Available Entities (Names): {{entities}}.
+Language: Generate content in {{language}}.
+Task: Create a multi-scene scenario.
+IMPORTANT: If the scenario introduces KEY CHARACTERS, LOCATIONS, or ITEMS that do not exist in the Available Entities list, define them in the 'newEntities' array so I can create them in the database.`,
+    chatGen: `You are an AI Game Master running a Tabletop RPG session.
+Language: Respond in {{language}}.
+World: {{worldContext}}
+Current Scenario: {{scenarioContext}}
+Chat History:
+{{history}}
+Task: Respond as the Game Master (SYSTEM). Describe the outcome of the user's action.
+If you invent a NEW significant NPC, Location, or Item that was not previously mentioned, please extract it into the 'newEntities' field.
+Keep response under 150 words.`
+};
+
 export const useWorldController = () => {
   const [world, setWorld] = useState<WorldState | null>(null);
   const [worlds, setWorlds] = useState<{id: string, name: string, lastPlayed: number, description: string, parentId?: string}[]>([]);
   const [view, setView] = useState('dashboard');
   const [loading, setLoading] = useState(true);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [settings, setSettings] = useState<AppSettings>({ aiProvider: AIProvider.GEMINI, ollamaUrl: 'http://localhost:11434', ollamaModel: 'llama3', language: 'en' });
+  const [settings, setSettings] = useState<AppSettings>({ 
+      aiProvider: AIProvider.GEMINI, 
+      ollamaUrl: 'http://localhost:11434', 
+      ollamaModel: 'llama3', 
+      language: 'fr', 
+      systemPrompts: DEFAULT_PROMPTS 
+  });
   const [selectedDashboardWorldId, setSelectedDashboardWorldId] = useState<string | null>(null);
   const [expandedWorldIds, setExpandedWorldIds] = useState<string[]>([]);
 
@@ -65,6 +98,7 @@ export const useWorldController = () => {
   const closeWorld = () => {
       handleSave();
       setWorld(null);
+      setView('dashboard');
   };
 
   // Helper for translations
@@ -94,8 +128,6 @@ export const useWorldController = () => {
       view,
       setView,
       loading,
-      isSettingsOpen,
-      setIsSettingsOpen,
       settings,
       setSettings,
       selectedDashboardWorldId,

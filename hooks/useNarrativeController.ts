@@ -1,6 +1,6 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Scenario, Session, SessionMessage, Timeline, TimelineEvent, Entity, Relationship } from '../types';
+import { Scenario, Session, SessionMessage, Timeline, TimelineEvent, Entity, Relationship, CalendarSystem } from '../types';
 import { generateId, getLocalized } from '../utils/helpers';
 
 export const useScenarioController = (world: any, setWorld: any) => {
@@ -51,15 +51,37 @@ export const useSessionController = (world: any, setWorld: any) => {
 
 export const useTimelineController = (world: any, setWorld: any) => {
     const [selectedTimelineId, setSelectedTimelineId] = useState<string | null>(world.timelines[0]?.id || null);
-    const timeline = world.timelines.find((t: Timeline) => t.id === selectedTimelineId);
+    const [viewMode, setViewMode] = useState<'chronicle' | 'gantt' | 'calendar'>('chronicle');
+    const [grouping, setGrouping] = useState<'millennia' | 'centuries' | 'decades' | 'years'>('years');
+    const [calendarViewDate, setCalendarViewDate] = useState({ year: 1000, month: 0 });
+    const [editingCalendarId, setEditingCalendarId] = useState<string | null>(null);
+
+    const timeline = world.timelines.find((t: Timeline) => t.id === selectedTimelineId) || world.timelines[0];
     const events = useMemo(() => {
+        if (!selectedTimelineId) return [];
         return world.events.filter((e: TimelineEvent) => e.timelineId === selectedTimelineId)
             .sort((a: any, b: any) => (a.year - b.year) || (a.month - b.month) || (a.day - b.day));
     }, [world.events, selectedTimelineId]);
 
+    const calendars = world.calendars;
+    const activeCalendar = calendars.find((c: CalendarSystem) => c.id === timeline?.calendarId) || calendars[0];
+
+    useEffect(() => {
+        if (timeline && !selectedTimelineId) setSelectedTimelineId(timeline.id);
+    }, [timeline]);
+
     const addEvent = () => {
         if (!timeline) return;
-        const newEvent: TimelineEvent = { id: generateId(), timelineId: timeline.id, title: "New Event", description: "Something happened.", year: 1000, month: 0, day: 1, involvedEntityIds: [] };
+        const newEvent: TimelineEvent = { 
+            id: generateId(), 
+            timelineId: timeline.id, 
+            title: "New Event", 
+            description: "Something happened.", 
+            year: calendarViewDate.year, 
+            month: calendarViewDate.month, 
+            day: 1, 
+            involvedEntityIds: [] 
+        };
         setWorld({...world, events: [...world.events, newEvent]});
     };
 
@@ -71,7 +93,49 @@ export const useTimelineController = (world: any, setWorld: any) => {
         setWorld({...world, events: world.events.filter((x:any) => x.id !== id)});
     };
 
-    return { selectedTimelineId, setSelectedTimelineId, timeline, events, addEvent, updateEvent, deleteEvent };
+    const createTimeline = () => {
+        const newT: Timeline = { id: generateId(), title: "New Timeline", calendarId: calendars[0].id };
+        setWorld({...world, timelines: [...world.timelines, newT]});
+        setSelectedTimelineId(newT.id);
+    };
+
+    const deleteTimeline = (id: string) => {
+        if (world.timelines.length <= 1) return;
+        setWorld({
+            ...world, 
+            timelines: world.timelines.filter((t:any) => t.id !== id),
+            events: world.events.filter((e:any) => e.timelineId !== id)
+        });
+        if(selectedTimelineId === id) setSelectedTimelineId(world.timelines.find((t:any)=>t.id !== id).id);
+    };
+
+    const createCalendar = () => {
+        const newC: CalendarSystem = { 
+            id: generateId(), 
+            name: "New Calendar", 
+            currentYear: 1, 
+            months: [{ name: "Month 1", days: 30 }], 
+            weekDays: ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6", "Day 7"] 
+        };
+        setWorld({...world, calendars: [...world.calendars, newC]});
+        setEditingCalendarId(newC.id);
+    };
+
+    const updateCalendar = (updated: CalendarSystem) => {
+        setWorld({...world, calendars: world.calendars.map((c:any) => c.id === updated.id ? updated : c)});
+    };
+
+    return { 
+        selectedTimelineId, setSelectedTimelineId, 
+        timeline, events, calendars, activeCalendar,
+        viewMode, setViewMode,
+        grouping, setGrouping,
+        calendarViewDate, setCalendarViewDate,
+        editingCalendarId, setEditingCalendarId,
+        createTimeline, deleteTimeline,
+        createCalendar, updateCalendar,
+        addEvent, updateEvent, deleteEvent 
+    };
 };
 
 export const useRelationshipController = (world: any, setWorld: any) => {
