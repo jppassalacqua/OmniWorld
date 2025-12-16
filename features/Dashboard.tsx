@@ -1,8 +1,10 @@
 
-import React from 'react';
-import { Globe2, Play, Plus, ChevronRight, PlusCircle, Trash2 } from 'lucide-react';
+import React, { useRef } from 'react';
+import { Globe2, Play, Plus, ChevronRight, PlusCircle, Trash2, Upload, Download, FileText, Map as MapIcon, Users, Sparkles } from 'lucide-react';
 import { ResizableSplitPane, TreeItem, TreeNode } from '../components/Shared';
+import { downloadWorldJSON, downloadWorldYAML } from '../utils/exportBridge';
 import { THEME } from '../styles/theme';
+import { dbService } from '../services/databaseService';
 
 interface DashboardProps {
     worlds: any[];
@@ -14,6 +16,7 @@ interface DashboardProps {
     handleCreate: (parentId?: string) => void;
     handleLoad: (id: string) => void;
     handleDelete: (id: string) => void;
+    handleImportWorld?: (json: string) => void;
     onOpenSettings?: () => void;
     t: (key: string) => string;
 }
@@ -28,12 +31,14 @@ export const Dashboard = ({
     handleCreate,
     handleLoad,
     handleDelete,
+    handleImportWorld,
     onOpenSettings,
     t
 }: DashboardProps) => {
     
     const displayedWorlds = worlds.filter(w => w.parentId === (selectedDashboardWorldId || undefined));
     const selectedDashboardWorld = worlds.find(w => w.id === selectedDashboardWorldId);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const toggleExpand = (id: string) => {
         setExpandedWorldIds(expandedWorldIds.includes(id) 
@@ -41,6 +46,73 @@ export const Dashboard = ({
             : [...expandedWorldIds, id]
         );
     };
+
+    const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file && handleImportWorld) {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                if (ev.target?.result) {
+                    handleImportWorld(ev.target.result as string);
+                }
+            };
+            reader.readAsText(file);
+        }
+    };
+
+    // Helper to asynchronously get stats for a world card
+    const WorldCard = ({ w }: { w: any }) => {
+        const [stats, setStats] = React.useState<any>(null);
+
+        React.useEffect(() => {
+             // Load full world data to count items (since we only load lightweight metadata initially)
+             // In a real optimized app, metadata would include counts. 
+             dbService.loadWorld(w.id).then(full => {
+                 if (full) {
+                     setStats({
+                         entities: full.entities.length,
+                         maps: full.maps.length,
+                         wiki: full.wikiPages.length,
+                         scenarios: full.scenarios.length
+                     });
+                 }
+             });
+        }, [w.id]);
+
+        return (
+            <div onClick={() => setSelectedDashboardWorldId(w.id)} className={THEME.card.base}>
+                <div className={THEME.card.header}>
+                    <div className={THEME.card.icon}>
+                        <Globe2 size={20}/>
+                    </div>
+                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
+                         {stats && (
+                             <>
+                                <button onClick={(e) => { e.stopPropagation(); downloadWorldJSON(w as any); }} className="p-2 bg-slate-800 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 shadow-lg" title="Export JSON"><Download size={14}/></button>
+                             </>
+                         )}
+                         <button onClick={(e) => { e.stopPropagation(); handleLoad(w.id); }} className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 shadow-lg shadow-emerald-500/20" title="Load"><Play size={14}/></button>
+                    </div>
+                </div>
+                <h3 className={THEME.card.title}>{w.name}</h3>
+                <p className={THEME.card.body}>{w.description}</p>
+                
+                {stats && (
+                    <div className="flex gap-3 my-3 text-[10px] text-slate-500 font-medium">
+                        <span className="flex items-center gap-1"><Users size={12}/> {stats.entities}</span>
+                        <span className="flex items-center gap-1"><MapIcon size={12}/> {stats.maps}</span>
+                        <span className="flex items-center gap-1"><FileText size={12}/> {stats.wiki}</span>
+                        <span className="flex items-center gap-1"><Sparkles size={12}/> {stats.scenarios}</span>
+                    </div>
+                )}
+
+                <div className={THEME.card.footer}>
+                    <span>{new Date(w.lastPlayed).toLocaleDateString()}</span>
+                    <button onClick={(e) => { e.stopPropagation(); if(confirm(t('world.delete_confirm'))) { handleDelete(w.id); }}} className="p-2 hover:bg-red-900/20 hover:text-red-400 rounded transition-colors"><Trash2 size={14}/></button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="h-screen bg-slate-950 text-slate-200 flex flex-col font-sans overflow-hidden">
@@ -73,10 +145,14 @@ export const Dashboard = ({
                                     />
                                 ))}
                             </div>
-                            <div className="p-4 border-t border-slate-800 bg-slate-900">
+                            <div className="p-4 border-t border-slate-800 bg-slate-900 flex flex-col gap-2">
                                 <button onClick={() => handleCreate(selectedDashboardWorldId || undefined)} className={THEME.button.primary + " w-full justify-center"}>
                                     <PlusCircle size={18}/> {selectedDashboardWorldId ? "Create Sub-World" : "Create New World"}
                                 </button>
+                                <button onClick={() => fileInputRef.current?.click()} className={THEME.button.secondary + " w-full justify-center flex items-center gap-2"}>
+                                    <Upload size={18}/> Import World JSON
+                                </button>
+                                <input ref={fileInputRef} type="file" accept=".json" className="hidden" onChange={onFileChange}/>
                             </div>
                         </div>
                     }
@@ -106,25 +182,7 @@ export const Dashboard = ({
 
                                 <div className={THEME.layout.grid}>
                                     {displayedWorlds.map(w => (
-                                        <div key={w.id} 
-                                             onClick={() => setSelectedDashboardWorldId(w.id)} 
-                                             className={THEME.card.base}
-                                        >
-                                            <div className={THEME.card.header}>
-                                                <div className={THEME.card.icon}>
-                                                    <Globe2 size={20}/>
-                                                </div>
-                                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
-                                                    <button onClick={(e) => { e.stopPropagation(); handleLoad(w.id); }} className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 shadow-lg shadow-emerald-500/20" title="Load"><Play size={14}/></button>
-                                                </div>
-                                            </div>
-                                            <h3 className={THEME.card.title}>{w.name}</h3>
-                                            <p className={THEME.card.body}>{w.description}</p>
-                                            <div className={THEME.card.footer}>
-                                                <span>{new Date(w.lastPlayed).toLocaleDateString()}</span>
-                                                <button onClick={(e) => { e.stopPropagation(); if(confirm(t('world.delete_confirm'))) { handleDelete(w.id); }}} className="p-2 hover:bg-red-900/20 hover:text-red-400 rounded transition-colors"><Trash2 size={14}/></button>
-                                            </div>
-                                        </div>
+                                        <WorldCard key={w.id} w={w} />
                                     ))}
                                     
                                     {displayedWorlds.length === 0 && (

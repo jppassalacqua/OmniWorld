@@ -1,6 +1,6 @@
 
 import { AppSettings, EntityType, GameSystem, SessionMessage, SupportedLanguage } from "../types";
-import { generateEntityDescription as geminiEntity, generateWorldLore as geminiLore, generateScenarioHook as geminiScenario, continueSessionChat as geminiChat, generateEntityImage as geminiImage, generateMapImage as geminiMap, translateText as geminiTranslate } from "./geminiService";
+import { generateEntityDescription as geminiEntity, generateWorldLore as geminiLore, generateScenarioHook as geminiScenario, continueSessionChat as geminiChat, generateEntityImage as geminiImage, generateMapImage as geminiMap, translateText as geminiTranslate, summarizeText as geminiSummarize } from "./geminiService";
 import { generateEntityDescription as ollamaEntity, generateWorldLore as ollamaLore, generateScenarioHook as ollamaScenario, continueSessionChat as ollamaChat, translateText as ollamaTranslate } from "./ollamaService";
 
 // --- Interfaces ---
@@ -12,6 +12,7 @@ export interface IAIService {
   continueSessionChat(worldContext: string, scenarioContext: string, history: SessionMessage[], lang: SupportedLanguage): Promise<{ response: string; newEntities: any[] }>;
   generateImage(prompt: string, type: 'entity' | 'map', entityType?: EntityType): Promise<string | null>;
   translateText(text: string, targetLang: SupportedLanguage): Promise<string>;
+  summarizeText(text: string, lang: SupportedLanguage): Promise<string>;
 }
 
 // --- Factory ---
@@ -53,6 +54,9 @@ class GeminiServiceImpl implements IAIService {
   async translateText(text: string, targetLang: SupportedLanguage) {
     return geminiTranslate(text, targetLang);
   }
+  async summarizeText(text: string, lang: SupportedLanguage) {
+    return geminiSummarize(text, lang);
+  }
 }
 
 class OllamaServiceImpl implements IAIService {
@@ -76,9 +80,12 @@ class OllamaServiceImpl implements IAIService {
   }
   async generateImage(prompt: string, type: 'entity' | 'map', entityType?: EntityType) {
     console.warn("Ollama does not support image generation natively yet.");
-    return null; // Ollama doesn't typically do Image Gen out of box without ComfyUI bindings
+    return null; 
   }
   async translateText(text: string, targetLang: SupportedLanguage) {
     return ollamaTranslate(this.settings, text, targetLang);
+  }
+  async summarizeText(text: string, lang: SupportedLanguage) {
+     return "Summarization not implemented for Ollama yet.";
   }
 }

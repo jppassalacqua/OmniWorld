@@ -1,11 +1,9 @@
-
 import React, { useState } from 'react';
-import { Map as MapIcon, Languages, X, Plus, Users, Box, Flag, Scroll, Download, Trash2, Pin } from 'lucide-react';
-import { Entity, Attribute, Relationship, SupportedLanguage, EntityType, WorldMap } from '../types';
+import { Map as MapIcon, Languages, X, Plus, Users, Box, Flag, Scroll } from 'lucide-react';
+import { Entity, Attribute, Relationship, SupportedLanguage, EntityType } from '../types';
 import { RichTextEditor, TagInput, ImageManager } from '../components/Shared';
 import { getLocalized } from '../utils/helpers';
 import { THEME } from '../styles/theme';
-import { downloadFoundryJSON } from '../utils/exportBridge';
 
 interface EntityDetailProps {
     entity: Entity;
@@ -13,20 +11,18 @@ interface EntityDetailProps {
     lang: SupportedLanguage;
     onUpdate: (e: Entity) => void;
     onCreateEntity: (d: any) => void;
-    onDelete: (id: string) => void;
     onExport: () => void;
     setView: (v: string) => void;
     aiService: any;
-    maps?: WorldMap[]; // Optional prop for backlink display
 }
 
-export const EntityDetail = ({ entity, allEntities, lang, onUpdate, onCreateEntity, onDelete, onExport, setView, aiService, maps }: EntityDetailProps) => {
+export const EntityDetail = ({ entity, allEntities, lang, onUpdate, onCreateEntity, onExport, setView, aiService }: EntityDetailProps) => {
     const [activeTab, setActiveTab] = useState('details');
     const [translatingField, setTranslatingField] = useState<string | null>(null);
 
     if (!entity) return <div className={THEME.layout.emptyState}>Select an entity</div>;
   
-    // Helper to check for descendants
+    // Helper to check for descendants (to filter parent selector)
     const isDescendant = (potentialParentId: string): boolean => {
         const potentialParent = allEntities.find(e => e.id === potentialParentId);
         if (!potentialParent) return false;
@@ -41,7 +37,10 @@ export const EntityDetail = ({ entity, allEntities, lang, onUpdate, onCreateEnti
         const name = getLocalized(entity.name, lang);
         const desc = getLocalized(entity.description, lang);
         const tags = entity.tags ? entity.tags.join(', ') : "";
+        
+        // Construct a richer prompt based on available info
         const prompt = `${desc || name}. ${tags ? `Tags: ${tags}` : ''}`;
+        
         return await aiService.generateImage(prompt, 'entity', entity.type);
     };
     
@@ -67,13 +66,7 @@ export const EntityDetail = ({ entity, allEntities, lang, onUpdate, onCreateEnti
             default: return Users;
         }
     };
-
-    // Find maps where this entity is pinned
-    const linkedMaps = maps ? maps.filter(m => m.pins.some(p => p.entityId === entity.id)) : [];
     
-    // Collect all unique tags for suggestions
-    const allTags = Array.from(new Set(allEntities.flatMap(e => e.tags)));
-
     return (
         <div className="h-full flex flex-col bg-slate-900 overflow-y-auto">
              <div className="relative h-96 shrink-0 bg-slate-950">
@@ -87,18 +80,6 @@ export const EntityDetail = ({ entity, allEntities, lang, onUpdate, onCreateEnti
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent pointer-events-none" />
                 
-                <div className="absolute top-4 left-4 z-10">
-                    <button onClick={() => onDelete(entity.id)} className="p-2 bg-red-900/80 hover:bg-red-600 text-white rounded-lg backdrop-blur border border-red-800 shadow-xl transition-colors" title="Delete Entity">
-                        <Trash2 size={16}/>
-                    </button>
-                </div>
-
-                <div className="absolute top-4 right-4 z-10 flex gap-2">
-                    <button onClick={() => downloadFoundryJSON(entity, lang)} className="p-2 bg-slate-900/80 hover:bg-indigo-600 text-white rounded-lg backdrop-blur border border-slate-700 shadow-xl" title="Export to Foundry VTT">
-                        <Download size={16}/>
-                    </button>
-                </div>
-
                 <div className="absolute bottom-4 left-6 z-10 w-full pr-12">
                     <div className="flex items-end gap-3 mb-1">
                         <input className="text-4xl font-bold text-white tracking-tight bg-transparent border-b border-transparent hover:border-white/20 focus:border-indigo-500 outline-none w-full shadow-black drop-shadow-md" value={getLocalized(entity.name, lang)} onChange={(e) => onUpdate({...entity, name: {...entity.name, [lang]: e.target.value}})}/>
@@ -111,7 +92,6 @@ export const EntityDetail = ({ entity, allEntities, lang, onUpdate, onCreateEnti
              <div className="flex border-b border-slate-700 bg-slate-900 px-6">
                 <button onClick={() => setActiveTab('details')} className={THEME.button.tab(activeTab === 'details')}>Details</button>
                 <button onClick={() => setActiveTab('relationships')} className={THEME.button.tab(activeTab === 'relationships')}>Relationships ({entity.relationships.length})</button>
-                {linkedMaps.length > 0 && <button onClick={() => setActiveTab('locations')} className={THEME.button.tab(activeTab === 'locations')}>Locations ({linkedMaps.length})</button>}
              </div>
              <div className="p-8 max-w-4xl mx-auto w-full space-y-8">
                  {activeTab === 'details' && (
@@ -129,7 +109,7 @@ export const EntityDetail = ({ entity, allEntities, lang, onUpdate, onCreateEnti
                             <div className="flex items-center gap-2 mb-3"><h3 className={THEME.text.header}>Description</h3><button onClick={() => handleTranslate('description')} disabled={!!translatingField} className="flex items-center gap-1 text-xs bg-indigo-900/50 text-indigo-300 hover:text-white px-2 py-0.5 rounded border border-indigo-500/30 hover:bg-indigo-600 transition-colors"><Languages size={12}/> Translate</button></div>
                             <RichTextEditor value={getLocalized(entity.description, lang)} onChange={(val) => onUpdate({...entity, description: {...entity.description, [lang]: val}})} entities={allEntities} lang={lang} placeholder="Describe this entity..." />
                         </div>
-                        <div><h3 className={THEME.text.header}>Tags</h3><TagInput tags={entity.tags || []} onChange={(newTags) => onUpdate({ ...entity, tags: newTags })} suggestions={allTags} /></div>
+                        <div><h3 className={THEME.text.header}>Tags</h3><TagInput tags={entity.tags || []} onChange={(newTags) => onUpdate({ ...entity, tags: newTags })} /></div>
                         <div>
                             <h3 className={THEME.text.header}>Attributes</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -152,21 +132,6 @@ export const EntityDetail = ({ entity, allEntities, lang, onUpdate, onCreateEnti
                              const target = allEntities.find((e: Entity) => e.id === rel.targetId);
                              return target ? (<div key={idx} className="flex items-center bg-slate-800 p-3 rounded border border-slate-700"><span className="text-indigo-400 font-bold text-sm w-24 text-right mr-4">{rel.type}</span><div className="w-px h-6 bg-slate-700 mr-4"/><span className="text-white text-sm">{getLocalized(target.name, lang)}</span></div>) : null;
                          })}
-                     </section>
-                 )}
-                 {activeTab === 'locations' && (
-                     <section className="grid grid-cols-2 gap-4">
-                         {linkedMaps.map(m => (
-                             <div key={m.id} className="bg-slate-800 rounded-lg p-3 border border-slate-700 flex items-center gap-3 hover:border-indigo-500 transition-colors cursor-default">
-                                 <div className="w-12 h-12 rounded bg-slate-900 overflow-hidden flex-shrink-0">
-                                     <img src={m.imageUrl} className="w-full h-full object-cover opacity-50"/>
-                                 </div>
-                                 <div>
-                                     <h4 className="text-white font-bold text-sm">{m.name}</h4>
-                                     <div className="text-xs text-slate-500 flex items-center gap-1"><Pin size={10}/> Pinned</div>
-                                 </div>
-                             </div>
-                         ))}
                      </section>
                  )}
              </div>

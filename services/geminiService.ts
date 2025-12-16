@@ -282,6 +282,28 @@ export const translateText = async (text: string, targetLang: SupportedLanguage)
   return res.translation;
 };
 
+export const summarizeText = async (text: string, lang: SupportedLanguage): Promise<string> => {
+    if (!process.env.API_KEY) throw new Error("API Key missing");
+    const model = "gemini-2.5-flash";
+    const prompt = `Summarize the following text in 3 sentences max. Language: ${lang === 'fr' ? 'French' : 'English'}.\n\nText: "${text}"`;
+    
+    const response = await ai.models.generateContent({
+        model,
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    summary: { type: Type.STRING }
+                }
+            }
+        }
+    });
+    const res = response.text ? JSON.parse(response.text) : { summary: "..." };
+    return res.summary;
+};
+
 // ... existing image gens ...
 export const generateEntityImage = async (description: string, entityType?: EntityType): Promise<string | null> => {
   if (!process.env.API_KEY) return null;

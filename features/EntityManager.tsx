@@ -79,10 +79,12 @@ export const EntityManager = ({ world, setWorld, onExport, setView, aiService, i
                         allEntities={world.entities} 
                         lang={world.language} 
                         onUpdate={ctrl.handleUpdateEntity} 
-                        onCreateEntity={ctrl.handleCreateEntity} 
+                        onCreateEntity={ctrl.handleCreateEntity}
+                        onDelete={ctrl.handleDeleteEntity}
                         onExport={onExport} 
                         setView={setView} 
                         aiService={aiService} 
+                        maps={world.maps}
                     />
                 ) : (
                     <div className={THEME.layout.emptyState}><Users size={64} className="mb-4 opacity-20"/><p>Select an entity to view details.</p></div>

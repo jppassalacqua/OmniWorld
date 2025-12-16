@@ -23,6 +23,7 @@ import {
     TimelineManager, 
     RelationshipManager 
 } from './features/NarrativeManagers';
+import { CommandPalette } from './components/CommandPalette';
 
 const App = () => {
   const {
@@ -34,10 +35,13 @@ const App = () => {
       expandedWorldIds, setExpandedWorldIds,
       aiService,
       handleCreate, handleLoad, handleSave, handleDelete, closeWorld,
+      handleImportWorld,
       t, worldTree
   } = useWorldController();
   
-  const [targetEntityId, setTargetEntityId] = useState<string | null>(null);
+  // Generic Navigation State (replacing simple targetEntityId)
+  const [navigationTarget, setNavigationTarget] = useState<{view: string, id: string | null}>({view: '', id: null});
+  const [isPaletteOpen, setIsPaletteOpen] = useState(false);
 
   // --- Auto-Save Logic ---
   const saveRef = useRef(handleSave);
@@ -66,15 +70,34 @@ const App = () => {
       }, 2000); 
       return () => clearTimeout(timeout);
   }, [world, handleSave]); 
+  
+  // 3. Command Palette Keyboard Shortcut
+  useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+          if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+              e.preventDefault();
+              setIsPaletteOpen(prev => !prev);
+          }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // -----------------------
 
+  // Legacy support for map pins which expect onNavigateToEntity
   const handleNavigateToEntity = (id: string) => {
-      setTargetEntityId(id);
+      setNavigationTarget({ view: 'entities', id });
       setView('entities');
   };
   
   const handleNavClick = (viewName: string) => {
-      setTargetEntityId(null); // Clear specific selection when using main nav
+      setNavigationTarget({ view: viewName, id: null });
+      setView(viewName);
+  };
+  
+  const handleGlobalNavigate = (viewName: string, id: string) => {
+      setNavigationTarget({ view: viewName, id });
       setView(viewName);
   };
 
@@ -113,6 +136,7 @@ const App = () => {
                     handleCreate={handleCreate}
                     handleLoad={handleLoad}
                     handleDelete={handleDelete}
+                    handleImportWorld={handleImportWorld}
                     onOpenSettings={() => setView('settings')}
                     t={t}
                 />
@@ -120,14 +144,17 @@ const App = () => {
           );
       }
 
+      // Helper to check if we have a target for the current view
+      const targetId = navigationTarget.view === view ? navigationTarget.id : null;
+
       switch(view) {
-          case 'entities': return <EntityManager world={world} setWorld={setWorld} onExport={() => ExportBridge.downloadUnityPackage(world)} setView={setView} aiService={aiService} initialSelectedId={targetEntityId} />;
-          case 'wiki': return <WikiManager world={world} setWorld={setWorld} aiService={aiService} />;
-          case 'maps': return <MapManager world={world} setWorld={setWorld} aiService={aiService} onNavigateToEntity={handleNavigateToEntity} />;
+          case 'entities': return <EntityManager world={world} setWorld={setWorld} onExport={() => ExportBridge.downloadUnityPackage(world)} setView={setView} aiService={aiService} initialSelectedId={targetId} />;
+          case 'wiki': return <WikiManager world={world} setWorld={setWorld} aiService={aiService} initialSelectedId={targetId} />;
+          case 'maps': return <MapManager world={world} setWorld={setWorld} aiService={aiService} onNavigateToEntity={handleNavigateToEntity} initialSelectedId={targetId} />;
           case 'relationships': return <RelationshipManager world={world} setWorld={setWorld} />;
-          case 'scenarios': return <ScenarioManager world={world} setWorld={setWorld} />;
-          case 'sessions': return <SessionManager world={world} setWorld={setWorld} />;
-          case 'timelines': return <TimelineManager world={world} setWorld={setWorld} />;
+          case 'scenarios': return <ScenarioManager world={world} setWorld={setWorld} aiService={aiService} initialSelectedId={targetId} />;
+          case 'sessions': return <SessionManager world={world} setWorld={setWorld} aiService={aiService} initialSelectedId={targetId} />;
+          case 'timelines': return <TimelineManager world={world} setWorld={setWorld} initialSelectedId={targetId} />;
           case 'dashboard': default:
               return (
                   <div className="p-8 overflow-y-auto h-full">
@@ -140,6 +167,9 @@ const App = () => {
                                <button onClick={() => handleNavClick('wiki')} className="p-4 bg-slate-900 border border-slate-800 hover:border-indigo-500 rounded-xl text-left transition-all group"><BookOpen className="text-emerald-500 mb-2 group-hover:scale-110 transition-transform"/><div className="font-bold text-white">{t('nav.wiki')}</div><div className="text-xs text-slate-500">World Lore & Notes</div></button>
                                <button onClick={() => handleNavClick('maps')} className="p-4 bg-slate-900 border border-slate-800 hover:border-indigo-500 rounded-xl text-left transition-all group"><MapIcon className="text-amber-500 mb-2 group-hover:scale-110 transition-transform"/><div className="font-bold text-white">{t('nav.maps')}</div><div className="text-xs text-slate-500">Cartography</div></button>
                                <button onClick={() => handleNavClick('scenarios')} className="p-4 bg-slate-900 border border-slate-800 hover:border-indigo-500 rounded-xl text-left transition-all group"><Sparkles className="text-purple-500 mb-2 group-hover:scale-110 transition-transform"/><div className="font-bold text-white">{t('nav.scenarios')}</div><div className="text-xs text-slate-500">Plots & Scenes</div></button>
+                           </div>
+                           <div className="text-center text-slate-500 text-sm mt-12 flex justify-center gap-4">
+                               <span className="flex items-center gap-1"><kbd className="bg-slate-800 px-1 rounded border border-slate-700">Cmd+K</kbd> to search</span>
                            </div>
                       </div>
                   </div>
@@ -170,6 +200,15 @@ const App = () => {
           )}
           
           <div className="flex-1 flex flex-col min-w-0 bg-slate-950 relative">{renderContent()}</div>
+
+          {world && (
+            <CommandPalette 
+                isOpen={isPaletteOpen} 
+                onClose={() => setIsPaletteOpen(false)} 
+                world={world}
+                onNavigate={handleGlobalNavigate}
+            />
+          )}
       </div>
   );
 };

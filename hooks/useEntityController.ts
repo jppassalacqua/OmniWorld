@@ -1,6 +1,6 @@
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { Entity, EntityType, TreeNode } from '../types';
+import { Entity, EntityType, TreeNode, Relationship } from '../types';
 import { Users } from 'lucide-react';
 import { generateId, getLocalized } from '../utils/helpers';
 
@@ -28,8 +28,9 @@ export const useEntityController = (world: any, setWorld: any, initialSelectedId
       return world.entities.filter((e: Entity) => {
           const q = search.toLowerCase();
           const n = getLocalized(e.name, world.language).toLowerCase();
+          const desc = getLocalized(e.description, world.language).toLowerCase();
           const typeMatch = filterType === 'ALL' || e.type === filterType;
-          return typeMatch && (n.includes(q) || (e.tags || []).join(' ').toLowerCase().includes(q));
+          return typeMatch && (n.includes(q) || desc.includes(q) || (e.tags || []).join(' ').toLowerCase().includes(q));
       });
   }, [world.entities, world.language, search, filterType]);
 
@@ -86,6 +87,46 @@ export const useEntityController = (world: any, setWorld: any, initialSelectedId
       if (data.parentId) {
           setExpandedIds(prev => [...prev, data.parentId]);
       }
+  };
+
+  const handleDeleteEntity = (id: string) => {
+      if(!confirm("Are you sure you want to delete this entity? This will remove it from all maps, relationships, and events.")) return;
+
+      // 1. Remove Entity and clean Relationships in other entities
+      const newEntities = world.entities
+        .filter((e: Entity) => e.id !== id)
+        .map((e: Entity) => ({
+            ...e,
+            relationships: e.relationships.filter((r: Relationship) => r.targetId !== id)
+        }));
+
+      // 2. Clean Map Pins
+      const newMaps = world.maps.map((m: any) => ({
+          ...m,
+          pins: m.pins.filter((p: any) => p.entityId !== id)
+      }));
+
+      // 3. Clean Events
+      const newEvents = world.events.map((e: any) => ({
+          ...e,
+          involvedEntityIds: (e.involvedEntityIds || []).filter((eid: string) => eid !== id)
+      }));
+
+      // 4. Clean Scenarios
+      const newScenarios = world.scenarios.map((s: any) => ({
+          ...s,
+          involvedEntities: (s.involvedEntities || []).filter((eid: string) => eid !== id)
+      }));
+
+      setWorld({
+          ...world,
+          entities: newEntities,
+          maps: newMaps,
+          events: newEvents,
+          scenarios: newScenarios
+      });
+
+      if(selectedEntityId === id) setSelectedEntityId(null);
   };
 
   const handleAddRelationship = (sourceId: string, targetId: string, type: string) => {
@@ -149,6 +190,7 @@ export const useEntityController = (world: any, setWorld: any, initialSelectedId
     selectedEntity,
     handleUpdateEntity,
     handleCreateEntity,
+    handleDeleteEntity,
     handleAddRelationship,
     handleRemoveRelationship,
     toggleExpand,

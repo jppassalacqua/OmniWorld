@@ -73,6 +73,26 @@ export const useWorldController = () => {
       setWorlds(all);
   };
 
+  const handleImportWorld = async (jsonString: string) => {
+      try {
+          const importedWorld = JSON.parse(jsonString) as WorldState;
+          if (!importedWorld.id || !importedWorld.entities) throw new Error("Invalid World Data");
+          
+          // Ensure ID uniqueness if importing duplicate
+          // For now, we overwrite if same ID, or user manually handles it. 
+          // Ideally we might regenerate ID but that breaks internal links. 
+          // We assume import is either backup restore or new world.
+          
+          await dbService.saveWorld(importedWorld);
+          const all = await dbService.loadAllWorlds();
+          setWorlds(all);
+          alert("Import successful!");
+      } catch (e) {
+          console.error(e);
+          alert("Failed to import world. Check file format.");
+      }
+  };
+
   const handleLoad = async (id: string) => { 
       const w = await dbService.loadWorld(id); 
       if (w) { 
@@ -136,6 +156,7 @@ export const useWorldController = () => {
       setExpandedWorldIds,
       aiService,
       handleCreate,
+      handleImportWorld,
       handleLoad,
       handleSave,
       handleDelete,

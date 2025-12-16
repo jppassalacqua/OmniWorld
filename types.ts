@@ -89,6 +89,7 @@ export interface SessionMessage {
   content: string;
   timestamp: number;
   attachments?: Attachment[];
+  diceRoll?: { formula: string; result: string; total: number };
 }
 
 export interface Session {
@@ -113,6 +114,13 @@ export interface MapPin {
   x: number;
   y: number;
   entityId: string;
+  layerId?: string; // If null, visible on all layers
+}
+
+export interface MapLayer {
+  id: string;
+  name: string;
+  imageUrl: string;
 }
 
 export interface WorldMap {
@@ -123,7 +131,8 @@ export interface WorldMap {
   associatedEntityId?: string;
   name: string;
   description?: string;
-  imageUrl: string;
+  imageUrl: string; // Default layer
+  layers?: MapLayer[]; // Alternate layers (e.g. Political, Historic)
   pins: MapPin[];
   scale?: number; // Total width of map in units
   distanceUnit?: string; // e.g., "km", "miles"
